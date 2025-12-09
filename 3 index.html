@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Beli for Bars · NYC Nightlife Ratings</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Leaflet (for the map) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+  </script>
+
+  <style>
+    :root {
+      --bg-main: #05010d;
+      --bg-card: #0f061e;
+      --accent: #a855f7;
+      --accent-soft: rgba(168, 85, 247, 0.3);
+      --accent-strong: rgba(168, 85, 247, 0.7);
+      --text-main: #f9f5ff;
+      --text-muted: #a3a3c2;
+      --danger: #fb7185;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro",
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #1f0738 0, #05010d 55%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Top nav */
+    header {
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(18px);
+      background: linear-gradient(
+        to right,
+        rgba(10, 3, 25, 0.9),
+        rgba(16, 6, 40, 0.82)
+      );
+      box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      background: radial-gradient(circle at 30% 20%, #f97316, #7c3aed 45%, #020617);
+      box-shadow: 0 0 14px rgba(168, 85, 247, 0.8);
+    }
+
+    .logo-title {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-size: 0.98rem;
+    }
+
+    .logo-sub {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .user-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: radial-gradient(circle at top left, #4c1d95, #020617 60%);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: var(--text-main);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+    }
+
+    .user-pill.logged-out .status-dot {
+      background: #f97316;
+      box-shadow: 0 0 8px rgba(249, 115, 22, 0.8);
+    }
+
+    /* Layout */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(300px, 1.05fr) minmax(380px, 1.1fr);
+      gap: 16px;
+      padding: 16px 18px 20px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left column */
+    .left {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .panel {
+      background: radial-gradient(circle at top, #140726, #05010d 65%);
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      padding: 14px 16px;
+      box-shadow: 0 0 28px rgba(15, 23, 42, 0.8);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .panel-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .chip {
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.7rem;
+      border: 1px solid var(--accent-soft);
+      background: rgba(15, 23, 42, 0.9);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+    }
+
+    .chip-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-strong);
+    }
+
+    /* Map */
+    #map {
+      height: 320px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+    }
+
+    @media (max-width: 900px) {
+      #map {
+        height: 260px;
+      }
+    }
+
+    /* Filter row */
+    .filter-row {
+      margin-top: 4px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-row label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .filter-select {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    /* Bar list */
+    .bar-list {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .bar-card {
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.26);
+      padding: 9px 10px;
+      background: radial-gradient(circle at top left, #1e1039, #020617 60%);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border 0.12s ease;
+    }
+
+    .bar-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.6);
+      border-color: var(--accent);
+    }
+
+    .bar-card.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px rgba(168, 85, 247, 0.9);
+    }
+
+    .bar-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .bar-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .bar-neighborhood {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .bar-tags {
+      font-size: 0.72rem;
+      color: var(--accent);
+    }
+
+    .bar-rating {
+      min-width: 70px;
+      text-align: right;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: flex-end;
+      justify-content: center;
+    }
+
+    .rating-number {
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+
+    .rating-caption {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+    }
+
+    /* Right column – details */
+    .right {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .bar-header-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .bar-title-main {
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .bar-subline {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.7rem;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      color: var(--text-muted);
+    }
+
+    .bar-rating-main {
+      text-align: right;
+    }
+
+    .bar-rating-main-number {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .bar-rating-main-label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .your-rating {
+      font-size: 0.75rem;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    /* Sections inside details */
+    .section {
+      margin-top: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      padding: 10px 12px;
+      background: radial-gradient(circle at top, #111827, #020617 75%);
+    }
+
+    .section-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .section-caption {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    /* Rating form */
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    input[type="number"],
+    input[type="text"],
+    input[type="file"],
+    select,
+    textarea {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 10px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      padding: 6px 10px;
+      font-size: 0.82rem;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    input[type="number"]:focus,
+    input[type="text"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px var(--accent-soft);
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      background: radial-gradient(circle at top left, #a855f7, #4c1d95);
+      color: white;
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.9);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 24px rgba(168, 85, 247, 1);
+      opacity: 0.95;
+    }
+
+    button:active {
+      transform: translateY(0);
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      box-shadow: none;
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover {
+      box-shadow: 0 0 10px rgba(148, 163, 184, 0.6);
+    }
+
+    .inline-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .hint {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .success {
+      font-size: 0.72rem;
+      color: #4ade80;
+      margin-top: 2px;
+    }
+
+    .error {
+      font-size: 0.72rem;
+      color: var(--danger);
+      margin-top: 2px;
+    }
+
+    /* Beli-style rating tiers */
+    .rating-tiers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .rating-tier-btn {
+      border-radius: 999px;
+      font-size: 0.75rem;
+      padding: 5px 10px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      background: rgba(15, 23, 42, 0.9);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+    }
+
+    .rating-tier-btn span {
+      font-size: 0.82rem;
+    }
+
+    .rating-tier-btn.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-soft);
+      background: radial-gradient(circle at top, #4c1d95, #020617 70%);
+      color: var(--text-main);
+    }
+
+    /* Photo grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+      gap: 6px;
+      margin-top: 8px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .photo-grid img {
+      width: 100%;
+      height: 88px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      box-shadow: 0 0 10px rgba(15, 23, 42, 0.8);
+    }
+
+    .empty-state {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Friends */
+    .friends-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .friend-pill {
+      border-radius: 999px;
+      padding: 5px 9px;
+      font-size: 0.72rem;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .friend-avatar {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: radial-gradient(circle at top, #1d4ed8, #a855f7);
+      display: inline-block;
+    }
+
+    .friend-pill button {
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      box-shadow: none;
+    }
+
+    .friend-pill.friend {
+      border-color: var(--accent);
+      background: radial-gradient(circle at top, #4c1d95, #020617 65%);
+    }
+
+    footer {
+      padding: 10px 18px 14px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    /* Auth modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+    }
+
+    .modal {
+      background: radial-gradient(circle at top, #1f2937, #020617 70%);
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      padding: 16px 18px 14px;
+      width: min(400px, 92vw);
+      box-shadow: 0 0 28px rgba(15, 23, 42, 0.9);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .modal-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      cursor: pointer;
+      font-size: 1.1rem;
+      color: var(--text-muted);
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .auth-tab {
+      flex: 1;
+      text-align: center;
+      padding: 6px 0;
+      font-size: 0.82rem;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: rgba(15, 23, 42, 0.9);
+      cursor: pointer;
+    }
+
+    .auth-tab.active {
+      border-color: var(--accent);
+      background: radial-gradient(circle at top, #4c1d95, #020617 70%);
+    }
+
+    .profile-chip {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 12px 14px;
+      }
+      main {
+        padding: 12px 10px 14px;
+      }
+      .panel {
+        padding: 10px 12px;
+      }
+      .bar-title-main {
+        font-size: 1.1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <div class="logo-icon"></div>
+      <div>
+        <div class="logo-title">Beli for Bars</div>
+        <div class="logo-sub">Like Beli, but for NYC nightlife—rate bars, share nights.</div>
+      </div>
+    </div>
+    <div id="user-pill" class="user-pill logged-out">
+      <span class="status-dot"></span>
+      <span id="user-pill-text">Sign up / Log in</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- LEFT: Map + bar list -->
+    <section class="left">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">NYC Bar Map</div>
+            <div class="chip" style="margin-top:4px;">
+              <span class="chip-dot"></span>
+              <span>Tonight’s bar scene</span>
+            </div>
+          </div>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Bars people are rating</div>
+          <span class="section-caption">Tap a bar to see details, photos & Beli-style ratings.</span>
+        </div>
+        <div class="filter-row">
+          <label for="neighborhood-filter">Neighborhood:</label>
+          <select id="neighborhood-filter" class="filter-select">
+            <option value="All">All neighborhoods</option>
+          </select>
+        </div>
+        <div id="bar-list" class="bar-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Selected bar details, rating, photos, friends -->
+    <section class="right">
+      <div class="panel" id="bar-detail-panel">
+        <div class="bar-header-line">
+          <div>
+            <div id="bar-title" class="bar-title-main">Choose a bar on the map</div>
+            <div id="bar-subline" class="bar-subline">
+              Find your next go-to NYC bar. Ratings blend your friends and the Beli for Bars community.
+            </div>
+            <div id="bar-tags" class="pill-row" style="display:none;"></div>
+            <div id="your-rating" class="your-rating" style="display:none;"></div>
+          </div>
+          <div class="bar-rating-main">
+            <div id="bar-rating-main-number" class="bar-rating-main-number">–</div>
+            <div id="bar-rating-main-label" class="bar-rating-main-label">Global rating</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title-row">
+            <div class="section-title">Rate this bar</div>
+            <div class="section-caption">Beli-style: pick a tier, then fine-tune your score.</div>
+          </div>
+
+          <form id="rating-form">
+            <!-- Beli-style tiers -->
+            <div class="rating-tiers" id="rating-tiers">
+              <button
+                class="rating-tier-btn"
+                type="button"
+                data-score="9.5"
+                data-label="Love">
+                <span>😍</span> <span>Love</span>
+              </button>
+              <button
+                class="rating-tier-btn"
+                type="button"
+                data-score="8.0"
+                data-label="Like">
+                <span>😊</span> <span>Like</span>
+              </button>
+              <button
+                class="rating-tier-btn"
+                type="button"
+                data-score="6.5"
+                data-label="Okay">
+                <span>😐</span> <span>Okay</span>
+              </button>
+              <button
+                class="rating-tier-btn"
+                type="button"
+                data-score="4.0"
+                data-label="Skip">
+                <span>😖</span> <span>Skip</span>
+              </button>
+            </div>
+
+            <div class="inline-row">
+              <div>
+                <label for="rating-input">Your numeric score (1–10)</label>
+                <input
+                  id="rating-input"
+                  type="number"
+                  min="1"
+                  max="10"
+                  step="0.5"
+                  placeholder="8.7"
+                  required
+                />
+              </div>
+              <div>
+                <label for="vibe-input">Vibe tag (optional)</label>
+                <input
+                  id="vibe-input"
+                  type="text"
+                  placeholder="Date night, Divey, High energy..."
+                />
+              </div>
+            </div>
+
+            <div class="inline-row">
+              <button type="submit">
+                ★ Save my bar rating
+              </button>
+              <span class="hint">
+                Prototype only: this saves in your browser and updates the bar’s average.
+              </span>
+            </div>
+            <div id="rating-message" class="success" style="display:none;"></div>
+          </form>
+        </div>
+
+        <div class="section">
+          <div class="section-title-row">
+            <div class="section-title">Photos from this bar</div>
+            <div class="section-caption">Drop a photo so your friends see your night out.</div>
+          </div>
+          <form id="photo-form">
+            <div class="inline-row">
+              <input id="photo-input" type="file" accept="image/*" multiple />
+              <button type="submit">Upload</button>
+              <span class="hint">Prototype: photos live only until you refresh.</span>
+            </div>
+            <div id="photo-message" class="success" style="display:none;"></div>
+          </form>
+          <div id="photo-grid" class="photo-grid"></div>
+          <div id="photo-empty" class="empty-state">No bar photos yet. Be the first.</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title-row">
+            <div class="section-title">Friends at this bar</div>
+            <button id="discover-friends-btn" class="btn-ghost" type="button">
+              Discover people who rated this
+            </button>
+          </div>
+          <div id="friends-list" class="friends-list">
+            <!-- Populated by JS -->
+          </div>
+          <div id="friends-empty" class="empty-state">
+            Once your friends join Beli for Bars, you’ll see who loved or skipped this bar.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Beli for Bars · NYC nightlife prototype</span>
+    <span>Next step: real bar data, real auth, and social feeds.</span>
+  </footer>
+
+  <!-- Auth modal -->
+  <div id="auth-backdrop" class="modal-backdrop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Welcome to Beli for Bars</div>
+        <div id="auth-close" class="modal-close">&times;</div>
+      </div>
+
+      <div class="auth-tabs">
+        <button id="tab-login" class="auth-tab active" type="button">Log in</button>
+        <button id="tab-signup" class="auth-tab" type="button">Sign up</button>
+      </div>
+
+      <form id="login-form">
+        <label for="login-username">Username</label>
+        <input id="login-username" type="text" placeholder="@username" required />
+        <label for="login-password">Password</label>
+        <input id="login-password" type="password" placeholder="••••••••" required />
+        <div class="inline-row">
+          <button type="submit">Log in</button>
+          <span class="hint">Prototype: any username/password will “log you in”.</span>
+        </div>
+        <div id="login-message" class="success" style="display:none;"></div>
+      </form>
+
+      <form id="signup-form" style="display:none;">
+        <label for="signup-username">Username</label>
+        <input id="signup-username" type="text" placeholder="@username" required />
+        <label for="signup-password">Password</label>
+        <input id="signup-password" type="password" placeholder="Create a password" required />
+        <div class="inline-row">
+          <button type="submit">Create account</button>
+          <span class="hint">Saved only on this device for this prototype.</span>
+        </div>
+        <div id="signup-message" class="success" style="display:none;"></div>
+      </form>
+
+      <div class="profile-chip" id="profile-chip" style="display:none;">
+        Logged in as <span id="profile-username"></span>. Your bar ratings will be tagged with this username.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Mock bar data: 10 example NYC bars --------------------------------
+    const bars = [
+      {
+        id: 1,
+        name: "Mr. Purple",
+        neighborhood: "Lower East Side",
+        lat: 40.7203,
+        lng: -73.9880,
+        tags: ["Rooftop", "Hotel bar", "Views"],
+        avgRating: 8.8,
+        ratingCount: 120,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 2,
+        name: "Hair of the Dog",
+        neighborhood: "Lower East Side",
+        lat: 40.7187,
+        lng: -73.9902,
+        tags: ["College crowd", "Sports", "Rowdy"],
+        avgRating: 7.9,
+        ratingCount: 210,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 3,
+        name: "Pianos",
+        neighborhood: "Lower East Side",
+        lat: 40.7217,
+        lng: -73.9887,
+        tags: ["Live music", "Dancing", "Upstairs lounge"],
+        avgRating: 8.4,
+        ratingCount: 160,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 4,
+        name: "The Dead Rabbit",
+        neighborhood: "Financial District",
+        lat: 40.7033,
+        lng: -74.0113,
+        tags: ["Cocktails", "Irish bar", "Classic"],
+        avgRating: 9.1,
+        ratingCount: 190,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 5,
+        name: "The Garret West",
+        neighborhood: "West Village",
+        lat: 40.7323,
+        lng: -74.0025,
+        tags: ["Speakeasy-ish", "Cocktails", "Hidden"],
+        avgRating: 8.7,
+        ratingCount: 95,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 6,
+        name: "Dante",
+        neighborhood: "West Village",
+        lat: 40.7287,
+        lng: -74.0020,
+        tags: ["Classic", "Negroni", "Date night"],
+        avgRating: 9.3,
+        ratingCount: 230,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 7,
+        name: "Westlight",
+        neighborhood: "Williamsburg",
+        lat: 40.7216,
+        lng: -73.9577,
+        tags: ["Rooftop", "Skyline views", "Reservation"],
+        avgRating: 9.0,
+        ratingCount: 175,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 8,
+        name: "Union Pool",
+        neighborhood: "Williamsburg",
+        lat: 40.7138,
+        lng: -73.9510,
+        tags: ["Outdoor", "Casual", "Tacos"],
+        avgRating: 8.2,
+        ratingCount: 140,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 9,
+        name: "Ray's Bar",
+        neighborhood: "Lower East Side",
+        lat: 40.7192,
+        lng: -73.9920,
+        tags: ["Divey", "Celebrity sightings", "Late night"],
+        avgRating: 8.1,
+        ratingCount: 110,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+      {
+        id: 10,
+        name: "Kind Regards",
+        neighborhood: "Lower East Side",
+        lat: 40.7211,
+        lng: -73.9896,
+        tags: ["Basement dance", "Date night", "Crowded"],
+        avgRating: 8.5,
+        ratingCount: 180,
+        vibes: [],
+        photos: [],
+        friends: [],
+        ratingsByUser: {}
+      },
+    ];
+
+    const mockPossibleFriends = [
+      "Sofia R.",
+      "Eli M.",
+      "Jules K.",
+      "Alex T.",
+      "Jordan P.",
+      "Maya L.",
+    ];
+
+    let selectedBarId = null;
+    let map;
+    let markers = [];
+    let currentUser = null;
+    let selectedTier = null; // { label, score }
+    let currentNeighborhoodFilter = "All";
+
+    // --- Auth helpers -------------------------------------------------------
+    const USER_STORAGE_KEY = "beliforbars-user";
+
+    function loadUserFromStorage() {
+      try {
+        const raw = localStorage.getItem(USER_STORAGE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    function saveUserToStorage(user) {
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+      } catch {}
+    }
+
+    function clearUserFromStorage() {
+      try {
+        localStorage.removeItem(USER_STORAGE_KEY);
+      } catch {}
+    }
+
+    function updateUserUI() {
+      const pill = document.getElementById("user-pill");
+      const text = document.getElementById("user-pill-text");
+      const profileChip = document.getElementById("profile-chip");
+      const profileUsername = document.getElementById("profile-username");
+
+      if (currentUser) {
+        pill.classList.remove("logged-out");
+        text.textContent = currentUser.username;
+        if (profileChip && profileUsername) {
+          profileUsername.textContent = currentUser.username;
+          profileChip.style.display = "block";
+        }
+      } else {
+        pill.classList.add("logged-out");
+        text.textContent = "Sign up / Log in";
+        if (profileChip) profileChip.style.display = "none";
+      }
+    }
+
+    // --- Map setup ----------------------------------------------------------
+    function initMap() {
+      map = L.map("map").setView([40.72, -73.99], 12);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap",
+      }).addTo(map);
+
+      bars.forEach((bar) => {
+        const marker = L.marker([bar.lat, bar.lng])
+          .addTo(map)
+          .bindPopup(
+            `<strong>${bar.name}</strong><br /><span style="font-size:12px;">${bar.neighborhood}</span><br /><span style="font-size:12px;color:#a855f7;">Rating: ${bar.avgRating.toFixed(
+              1
+            )}</span>`
+          );
+        marker.on("click", () => selectBar(bar.id));
+        markers.push({ id: bar.id, marker });
+      });
+    }
+
+    // --- Neighborhood filter -----------------------------------------------
+    function initNeighborhoodFilter() {
+      const select = document.getElementById("neighborhood-filter");
+      const neighborhoods = Array.from(
+        new Set(bars.map((b) => b.neighborhood))
+      ).sort();
+
+      neighborhoods.forEach((n) => {
+        const opt = document.createElement("option");
+        opt.value = n;
+        opt.textContent = n;
+        select.appendChild(opt);
+      });
+
+      select.addEventListener("change", () => {
+        currentNeighborhoodFilter = select.value;
+        renderBarList();
+      });
+    }
+
+    // --- Bar list UI --------------------------------------------------------
+    function renderBarList() {
+      const listEl = document.getElementById("bar-list");
+      listEl.innerHTML = "";
+
+      const filteredBars =
+        currentNeighborhoodFilter === "All"
+          ? bars
+          : bars.filter((b) => b.neighborhood === currentNeighborhoodFilter);
+
+      if (!filteredBars.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = "No bars found for this neighborhood.";
+        listEl.appendChild(empty);
+        return;
+      }
+
+      filteredBars.forEach((bar) => {
+        const card = document.createElement("div");
+        card.className = "bar-card";
+        card.dataset.id = bar.id;
+
+        card.innerHTML = `
+          <div class="bar-meta">
+            <div class="bar-name">${bar.name}</div>
+            <div class="bar-neighborhood">${bar.neighborhood}</div>
+            <div class="bar-tags">${bar.tags.join(" • ")}</div>
+          </div>
+          <div class="bar-rating">
+            <div class="rating-number">${bar.avgRating.toFixed(1)}</div>
+            <div class="rating-caption">${bar.ratingCount} ratings</div>
+          </div>
+        `;
+
+        card.addEventListener("click", () => selectBar(bar.id));
+        listEl.appendChild(card);
+      });
+
+      updateActiveBarCard();
+    }
+
+    function updateActiveBarCard() {
+      const cards = document.querySelectorAll(".bar-card");
+      cards.forEach((card) => {
+        const id = Number(card.dataset.id);
+        if (id === selectedBarId) {
+          card.classList.add("active");
+        } else {
+          card.classList.remove("active");
+        }
+      });
+    }
+
+    // --- Select bar + render details ---------------------------------------
+    function selectBar(id) {
+      selectedBarId = id;
+      updateActiveBarCard();
+      const bar = bars.find((b) => b.id === id);
+      if (!bar) return;
+
+      // Move map to bar
+      if (map) {
+        map.setView([bar.lat, bar.lng], 14, { animate: true });
+      }
+
+      // Title + subtitle
+      const titleEl = document.getElementById("bar-title");
+      const sublineEl = document.getElementById("bar-subline");
+      const ratingNumberEl = document.getElementById("bar-rating-main-number");
+      const tagsContainer = document.getElementById("bar-tags");
+      const yourRatingEl = document.getElementById("your-rating");
+
+      titleEl.textContent = bar.name;
+      sublineEl.textContent = `${bar.neighborhood} · ${bar.tags
+        .slice(0, 3)
+        .join(" • ")} · ${bar.ratingCount} global ratings`;
+
+      ratingNumberEl.textContent =
+        bar.ratingCount > 0 ? bar.avgRating.toFixed(1) : "–";
+
+      // Tags
+      tagsContainer.innerHTML = "";
+      bar.tags.forEach((tag) => {
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.textContent = tag;
+        tagsContainer.appendChild(pill);
+      });
+      tagsContainer.style.display = bar.tags.length ? "flex" : "none";
+
+      // Your rating (if logged in + rated)
+      if (currentUser && bar.ratingsByUser[currentUser.username]) {
+        const r = bar.ratingsByUser[currentUser.username];
+        const vibePart = r.vibe ? ` · ${r.vibe}` : "";
+        const tierPart = r.tier ? r.tier : "Rated";
+        yourRatingEl.textContent = `Your rating: ${tierPart} ${r.score.toFixed(
+          1
+        )}${vibePart}`;
+        yourRatingEl.style.display = "block";
+      } else {
+        yourRatingEl.style.display = "none";
+      }
+
+      // Reset messages and tier
+      document.getElementById("rating-message").style.display = "none";
+      document.getElementById("photo-message").style.display = "none";
+      resetRatingTiers();
+
+      renderPhotoGrid(bar);
+      renderFriends(bar);
+    }
+
+    // --- Rating form + Beli-style tiers ------------------------------------
+    function setupRatingForm() {
+      const form = document.getElementById("rating-form");
+      const tierButtons = document.querySelectorAll(".rating-tier-btn");
+      const ratingInput = document.getElementById("rating-input");
+
+      tierButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          tierButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const score = parseFloat(btn.dataset.score);
+          const label = btn.dataset.label;
+          selectedTier = { score, label };
+          ratingInput.value = score.toFixed(1);
+        });
+      });
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!selectedBarId) {
+          showRatingMessage("Select a bar first.", true);
+          return;
+        }
+
+        const bar = bars.find((b) => b.id === selectedBarId);
+        if (!bar) return;
+
+        const ratingValue = parseFloat(ratingInput.value);
+        const vibeInput = document.getElementById("vibe-input");
+
+        if (isNaN(ratingValue) || ratingValue < 1 || ratingValue > 10) {
+          showRatingMessage("Rating must be between 1 and 10.", true);
+          return;
+        }
+
+        // Update average rating (simple running average for prototype)
+        const totalScore = bar.avgRating * bar.ratingCount + ratingValue;
+        bar.ratingCount += 1;
+        bar.avgRating = totalScore / bar.ratingCount;
+
+        // Save vibe
+        if (vibeInput.value.trim()) {
+          bar.vibes.push(vibeInput.value.trim());
+          if (!bar.tags.includes(vibeInput.value.trim())) {
+            bar.tags.push(vibeInput.value.trim());
+          }
+        }
+
+        // Attach rating to user if logged in
+        if (currentUser) {
+          bar.ratingsByUser[currentUser.username] = {
+            score: ratingValue,
+            tier: selectedTier ? selectedTier.label : null,
+            vibe: vibeInput.value.trim() || null,
+          };
+
+          // Light social feature: user appears as "friend" for this bar
+          const existingFriend = bar.friends.find(
+            (f) => f.name === currentUser.username
+          );
+          if (!existingFriend) {
+            bar.friends.push({ name: currentUser.username, isFriend: true });
+          }
+        }
+
+        ratingInput.value = "";
+        vibeInput.value = "";
+        resetRatingTiers();
+
+        showRatingMessage("Saved your bar rating.", false);
+        renderBarList();
+        selectBar(bar.id);
+      });
+    }
+
+    function resetRatingTiers() {
+      selectedTier = null;
+      const tierButtons = document.querySelectorAll(".rating-tier-btn");
+      tierButtons.forEach((b) => b.classList.remove("active"));
+    }
+
+    function showRatingMessage(message, isError) {
+      const msg = document.getElementById("rating-message");
+      msg.textContent = message;
+      msg.className = isError ? "error" : "success";
+      msg.style.display = "block";
+      setTimeout(() => {
+        msg.style.display = "none";
+      }, 2500);
+    }
+
+    // --- Photos -------------------------------------------------------------
+    function setupPhotoForm() {
+      const form = document.getElementById("photo-form");
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!selectedBarId) {
+          showPhotoMessage("Select a bar first.", true);
+          return;
+        }
+        const input = document.getElementById("photo-input");
+        const files = Array.from(input.files || []);
+        if (!files.length) {
+          showPhotoMessage("Choose at least one photo.", true);
+          return;
+        }
+
+        const bar = bars.find((b) => b.id === selectedBarId);
+        if (!bar) return;
+
+        files.forEach((file) => {
+          const url = URL.createObjectURL(file);
+          bar.photos.push(url);
+        });
+
+        input.value = "";
+        showPhotoMessage("Bar photos added (local only).", false);
+        renderPhotoGrid(bar);
+      });
+    }
+
+    function showPhotoMessage(message, isError) {
+      const msg = document.getElementById("photo-message");
+      msg.textContent = message;
+      msg.className = isError ? "error" : "success";
+      msg.style.display = "block";
+      setTimeout(() => {
+        msg.style.display = "none";
+      }, 2500);
+    }
+
+    function renderPhotoGrid(bar) {
+      const grid = document.getElementById("photo-grid");
+      const empty = document.getElementById("photo-empty");
+      if (!bar.photos.length) {
+        grid.innerHTML = "";
+        empty.style.display = "block";
+        return;
+      }
+      empty.style.display = "none";
+      grid.innerHTML = "";
+      bar.photos.forEach((src) => {
+        const img = document.createElement("img");
+        img.src = src;
+        grid.appendChild(img);
+      });
+    }
+
+    // --- Friends / social ---------------------------------------------------
+    function setupFriendsDiscover() {
+      const btn = document.getElementById("discover-friends-btn");
+      btn.addEventListener("click", () => {
+        if (!selectedBarId) return;
+        const bar = bars.find((b) => b.id === selectedBarId);
+        if (!bar) return;
+
+        if (!bar.friends.length) {
+          // randomly pick some "friends" to show
+          const randomCount = Math.floor(Math.random() * 3) + 2; // 2-4 friends
+          const shuffled = [...mockPossibleFriends].sort(
+            () => Math.random() - 0.5
+          );
+          bar.friends = shuffled.slice(0, randomCount).map((name) => ({
+            name,
+            isFriend: false,
+          }));
+        }
+
+        renderFriends(bar);
+      });
+    }
+
+    function renderFriends(bar) {
+      const list = document.getElementById("friends-list");
+      const empty = document.getElementById("friends-empty");
+
+      if (!bar.friends.length) {
+        list.innerHTML = "";
+        empty.style.display = "block";
+        return;
+      }
+
+      empty.style.display = "none";
+      list.innerHTML = "";
+
+      bar.friends.forEach((friend) => {
+        const pill = document.createElement("div");
+        pill.className = "friend-pill" + (friend.isFriend ? " friend" : "");
+        pill.innerHTML = `
+          <span class="friend-avatar"></span>
+          <span>${friend.name}</span>
+        `;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = friend.isFriend ? "Friends" : "Add";
+        btn.className = friend.isFriend ? "btn-ghost" : "";
+        btn.addEventListener("click", () => {
+          friend.isFriend = !friend.isFriend;
+          renderFriends(bar);
+        });
+        pill.appendChild(btn);
+        list.appendChild(pill);
+      });
+    }
+
+    // --- Auth modal logic ---------------------------------------------------
+    function setupAuth() {
+      const userPill = document.getElementById("user-pill");
+      const backdrop = document.getElementById("auth-backdrop");
+      const closeBtn = document.getElementById("auth-close");
+      const tabLogin = document.getElementById("tab-login");
+      const tabSignup = document.getElementById("tab-signup");
+      const loginForm = document.getElementById("login-form");
+      const signupForm = document.getElementById("signup-form");
+      const loginMessage = document.getElementById("login-message");
+      const signupMessage = document.getElementById("signup-message");
+
+      function openModal() {
+        backdrop.classList.add("show");
+        loginMessage.style.display = "none";
+        signupMessage.style.display = "none";
+      }
+
+      function closeModal() {
+        backdrop.classList.remove("show");
+      }
+
+      userPill.addEventListener("click", () => {
+        // If already logged in, treat click as "log out?" confirmation
+        if (currentUser) {
+          const confirmed = confirm("Log out of Beli for Bars?");
+          if (confirmed) {
+            currentUser = null;
+            clearUserFromStorage();
+            updateUserUI();
+            const yourRatingEl = document.getElementById("your-rating");
+            yourRatingEl.style.display = "none";
+          }
+        } else {
+          openModal();
+        }
+      });
+
+      closeBtn.addEventListener("click", closeModal);
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) {
+          closeModal();
+        }
+      });
+
+      tabLogin.addEventListener("click", () => {
+        tabLogin.classList.add("active");
+        tabSignup.classList.remove("active");
+        loginForm.style.display = "flex";
+        signupForm.style.display = "none";
+      });
+
+      tabSignup.addEventListener("click", () => {
+        tabSignup.classList.add("active");
+        tabLogin.classList.remove("active");
+        signupForm.style.display = "flex";
+        loginForm.style.display = "none";
+      });
+
+      signupForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const username = document.getElementById("signup-username").value.trim();
+        const password = document.getElementById("signup-password").value.trim();
+        if (!username || !password) return;
+
+        currentUser = { username };
+        saveUserToStorage(currentUser);
+        updateUserUI();
+        signupMessage.textContent = "Account created. You’re logged in.";
+        signupMessage.style.display = "block";
+
+        setTimeout(() => {
+          closeModal();
+        }, 800);
+      });
+
+      loginForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const username = document.getElementById("login-username").value.trim();
+        const password = document.getElementById("login-password").value.trim();
+        if (!username || !password) return;
+
+        // Prototype: accept anything
+        currentUser = { username };
+        saveUserToStorage(currentUser);
+        updateUserUI();
+        loginMessage.textContent = "Logged in. Let’s rate some bars.";
+        loginMessage.style.display = "block";
+
+        setTimeout(() => {
+          closeModal();
+        }, 800);
+      });
+    }
+
+    // --- Init ----------------------------------------------------------------
+    document.addEventListener("DOMContentLoaded", () => {
+      currentUser = loadUserFromStorage();
+      updateUserUI();
+
+      initMap();
+      initNeighborhoodFilter();
+      renderBarList();
+      setupRatingForm();
+      setupPhotoForm();
+      setupFriendsDiscover();
+      setupAuth();
+    });
+  </script>
+</body>
+</html>
